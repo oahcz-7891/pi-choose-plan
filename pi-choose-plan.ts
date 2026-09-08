@@ -23,7 +23,8 @@ import { Container, getKeybindings, Spacer, Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox";
 
 // Minimal strong rule (English to match system prompt & save tokens)
-const RULE = `[Rule] When multiple feasible plans exist, call choose_plan to let the user pick; do NOT list them as text.`;
+// 兜底：不依赖“方案/plan”这类词，而是按语义场景触发（多个可行路径 / 决策岔口 / 即将用文本罗列）。
+const RULE = `[Rule] Use choose_plan whenever more than one reasonable way to proceed exists — NOT only when options are called "plans"/"方案". Signals: multiple viable approaches/reads of the request, an unclear best path, or about to list alternatives as text -> call choose_plan instead. When in doubt, prefer choose_plan over guessing.`;
 
 const ChoosePlanParams = Type.Object({
 	question: Type.String({ description: "Prompt/" }),

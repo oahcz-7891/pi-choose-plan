@@ -8,7 +8,7 @@
 
 ## 功能 / 特性
 
-- 注入强约束规则：多个可行方案时调用 `choose_plan` 让用户选择，而不是列成文本。
+- 注入强约束规则：只要存在多个合理可行的路径（不依赖提示词里是否出现“方案/plan”等词），就调用 `choose_plan` 让用户选择，而不是列成文本或擅自猜测。
 - 注册 `choose_plan` 工具：弹出一个白色编号选择框（ABC / 123 编号），选项文字统一白色，仅选中项用 accent 箭头标记。
 - 描述完整显示、不截断；编号顺序与模型返回一致。
 - 方案 A（回显）：选中后把完整方案列表（编号 + 标签 + 描述）写进聊天记录，选完仍可见、可引用，改主意直接说“换成 B/C”即可，不用重问 LLM。
@@ -20,10 +20,13 @@
 
 两条路径：
 
-1. `before_agent_start`：向系统提示注入精简强约束规则
+1. `before_agent_start`：向系统提示注入精简强约束规则。规则按**语义场景**触发而非关键词匹配，起到兜底作用——即便用户没说“方案”这类词，只要客观上有多条合理路径 / 决策岔口 / 即将用文本罗列备选，也会触发：
 
    ```
-   [Rule] When multiple feasible plans exist, call choose_plan to let the user pick; do NOT list them as text.
+   [Rule] Use choose_plan whenever more than one reasonable way to proceed exists — NOT
+   only when options are called "plans"/"方案". Signals: multiple viable approaches/reads
+   of the request, an unclear best path, or about to list alternatives as text -> call
+   choose_plan instead. When in doubt, prefer choose_plan over guessing.
    ```
 
 2. `registerTool`：注册 `choose_plan` 工具（内置白色 ABC 编号选择框）
@@ -67,11 +70,24 @@ pi -e C:/完整路径/.pi/extensions/pi-choose-plan.ts
 
 注意：`-e` 建议用**绝对路径**（相对路径在部分启动方式下解析不到）。适用于临时体验，不推荐长期使用。
 
+### 方式四：团队分享（git 仓库 + pi 包）
+
+仓库已包含 pi 包清单（`package.json` 的 `pi.extensions` 字段，指向 `pi-choose-plan.ts`）。推送到 git 仓库后，同事在任何项目里：
+
+```bash
+pi install git:https://github.com/oahcz-7891/pi-choose-plan.git
+pi list          # 确认安装 / verify installation
+```
+
+`pi install` 安装的是 pi 包（全局生效，不依赖项目信任）；若只是单项目试用，仍可用前面的方式一 / 方式三。
+
 ---
 
 ## 使用说明
 
-当多个可行方案存在时，agent 会调用 `choose_plan`，弹出一个带编号的选择框：
+当存在多个合理可行的路径时，agent 会调用 `choose_plan`，弹出一个带编号的选择框：
+
+- 触发不依赖提示词里是否出现“方案/plan”等词：只要请求存在多种可行解读/做法、最优路径不明确，或模型原本想用文本罗列备选，都会优先调用 `choose_plan` 让用户拍板。
 
 - 用 `↑` / `↓` 或 `j` / `k` 移动，`Enter` 确认，`Esc` 取消。
 - 选项编号为 A、B、C…… 与模型返回的方案一一对应。
@@ -90,3 +106,4 @@ TUI 里只能用纯色。`choose-plan-preview.html` 提供了多种配色样式�
 
 - `pi-choose-plan.ts`：扩展主文件。
 - `choose-plan-preview.html`：选择框配色预览。
+- `package.json`：pi 包清单，用于 `pi install git:...` 团队分享安装。
