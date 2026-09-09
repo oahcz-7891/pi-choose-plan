@@ -2,7 +2,7 @@
  * pi-choose-plan —— 方案选择扩展（简洁版）
  *
  * 两条路径：
- *   1. before_agent_start 注入精简强约束规则（多个可行方案时用 choose_plan 工具）
+ *   1. before_agent_start 注入软性提示规则（choose_plan 可选：完整回复后再调用，选项仅方案名称）
  *   2. registerTool 注册 choose_plan 工具（内置白色 ABC 编号选择框）
  *
  * 方案 A（回显）：选中后把完整方案列表（编号+标签+描述）写进聊天记录，
@@ -22,9 +22,14 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Container, getKeybindings, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
-// Minimal strong rule (English to match system prompt & save tokens)
-// 兜底：不依赖“方案/plan”这类词，而是按语义场景触发（多个可行路径 / 决策岔口 / 即将用文本罗列）。
-const RULE = `[Rule] Use choose_plan whenever more than one reasonable way to proceed exists — NOT only when options are called "plans"/"方案". Signals: multiple viable approaches/reads of the request, an unclear best path, or about to list alternatives as text -> call choose_plan instead. When in doubt, prefer choose_plan over guessing.`;
+// Advisory rule (English to match system prompt & save tokens)
+// 软性提示：choose_plan 是可选工具，仅在确实有帮助时才调用；且须在完整输出消息之后再调用，
+// 选项只填方案名称（label），不填描述——不改变模型原本的文本输出。
+const RULE = `[Rule] choose_plan is an optional tool — call it only when it genuinely helps, 
+i.e. after finishing your full reply, a real user decision still remains. Never let it 
+interrupt or replace your text output: write your complete answer first, then call choose_plan 
+at the end, passing plans as names only (labels), no descriptions. Labels must be plan names 
+without any numbering prefix — no letters, digits, or 一二三 at the start; the picker adds letters.`;
 
 const ChoosePlanParams = Type.Object({
 	question: Type.String({ description: "Prompt/" }),
@@ -136,7 +141,7 @@ class PlanSelector extends Container {
 		}
 	}
 
-	dispose() {}
+	dispose() { }
 }
 
 /** 弹出白色编号选择框，返回选中的下标；取消返回 undefined。 */

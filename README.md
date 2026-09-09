@@ -1,6 +1,6 @@
 # pi-choose-plan
 
-方案选择扩展（简洁版）。当 agent 面对多个可行方案时，不再用纯文本罗列，而是弹出可键盘导航的编号选择框让用户拍板，选完把完整方案回显到聊天记录，便于随时引用和切换。
+方案选择扩展（简洁版）。choose_plan 是可选工具：模型先完整输出自己的回复，若末尾仍有需要用户拍板的真实选择，再弹出可键盘导航的编号选择框（选项仅方案名称），选完把完整方案回显到聊天记录，便于随时引用和切换。
 
 交互与 Pi 的模型选择器一致：方向键 / jk 上下移动、回车确认、Esc 取消。
 
@@ -8,7 +8,7 @@
 
 ## 功能 / 特性
 
-- 注入强约束规则：只要存在多个合理可行的路径（不依赖提示词里是否出现“方案/plan”等词），就调用 `choose_plan` 让用户选择，而不是列成文本或擅自猜测。
+- 注入软性提示规则：`choose_plan` 是**可选工具**，模型自行判断是否调用——要求**先完整输出文本回复、仅在末尾确有真实选择需要拍板时才调用**，选项只填方案名称（label），且名称**不得自带编号前缀**（A/1/一 等，编号由选择框统一生成），不改变模型原本的输出。
 - 注册 `choose_plan` 工具：弹出一个白色编号选择框（ABC / 123 编号），选项文字统一白色，仅选中项用 accent 箭头标记。
 - 描述完整显示、不截断；编号顺序与模型返回一致。
 - 方案 A（回显）：选中后把完整方案列表（编号 + 标签 + 描述）写进聊天记录，选完仍可见、可引用，改主意直接说“换成 B/C”即可，不用重问 LLM。
@@ -20,14 +20,18 @@
 
 两条路径：
 
-1. `before_agent_start`：向系统提示注入精简强约束规则。规则按**语义场景**触发而非关键词匹配，起到兜底作用——即便用户没说“方案”这类词，只要客观上有多条合理路径 / 决策岔口 / 即将用文本罗列备选，也会触发：
+1. `before_agent_start`：向系统提示注入一条**软性提示规则**——`choose_plan` 是可选工具，是否调用由模型自行判断，且**先完整输出文本回复、末尾确有真实选择需要拍板时才调用**；选项仅填方案名称（label），不填描述：
 
    ```
-   [Rule] Use choose_plan whenever more than one reasonable way to proceed exists — NOT
-   only when options are called "plans"/"方案". Signals: multiple viable approaches/reads
-   of the request, an unclear best path, or about to list alternatives as text -> call
-   choose_plan instead. When in doubt, prefer choose_plan over guessing.
+   [Rule] choose_plan is an optional tool — call it only when it genuinely helps, i.e. after
+   finishing your full reply, a real user decision still remains. Never let it interrupt or
+   replace your text output: write your complete answer first, then call choose_plan at the
+   end, passing plans as names only (labels), no descriptions. Labels must be plan names
+   without any numbering prefix — no letters, digits, or 一二三 at the start; the picker adds
+   letters.
    ```
+
+   这样设计是为了**不改变模型原本的输出**：对比分析、优缺点等仍以模型自己的风格写在回复里，选择框只在回复结束后作为“收尾拍板”出现，选项仅列方案名称。
 
 2. `registerTool`：注册 `choose_plan` 工具（内置白色 ABC 编号选择框）
 
@@ -85,12 +89,15 @@ pi list          # 确认安装 / verify installation
 
 ## 使用说明
 
-当存在多个合理可行的路径时，agent 会调用 `choose_plan`，弹出一个带编号的选择框：
+模型自行判断是否调用 `choose_plan`，调用时遵循两条约束：
 
-- 触发不依赖提示词里是否出现“方案/plan”等词：只要请求存在多种可行解读/做法、最优路径不明确，或模型原本想用文本罗列备选，都会优先调用 `choose_plan` 让用户拍板。
+- **先完整输出**：模型先按自己的方式写完整个回复（对比分析、优缺点等都不受影响），选择框不会打断或替换文本输出。
+- **收尾拍板**：仅当回复末尾确有需要用户拍板的真实选择时，才在最后调用 `choose_plan` 弹框；选项只填方案名称（不带 A/1/一 等编号前缀，编号由选择框统一生成），编号 A、B、C…… 与回复文本中的方案一一对应。
+
+选择框操作：
 
 - 用 `↑` / `↓` 或 `j` / `k` 移动，`Enter` 确认，`Esc` 取消。
-- 选项编号为 A、B、C…… 与模型返回的方案一一对应。
+- 选项编号为 A、B、C…… 与回复文本中的方案对应。
 - 列表末尾有一项“都不选”（None of the above），选中即以 `terminate` 结束本轮会话。
 - 选中后完整方案列表会回显到聊天记录，之后可以说“换成 B”来切换，无需重问。
 
